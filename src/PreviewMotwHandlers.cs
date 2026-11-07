@@ -1,6 +1,6 @@
 // PreviewMotwHandlers.cs
 // Managed Windows shell preview handler: raster images, PSD/PSB composites,
-// SVG (via IE WebBrowser control), EPS/AI/PS (via Ghostscript).
+// SVG (via IE WebBrowser control).
 //
 // Build (no SDK required, csc ships with .NET Framework 4.x):
 //   %SystemRoot%\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:library /platform:x64
@@ -15,7 +15,6 @@
 // Source files must be saved as UTF-8 with BOM: csc.exe derives the source
 // encoding from the BOM.
 using System;
-using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -219,11 +218,6 @@ namespace PreviewMotw
                 try { img = PsdReader.GetPreview(_filePath); } catch (Exception ex) { Diagnostics.Set("psd error " + ex.Message); }
             }
 
-            if (img == null && (ext == ".eps" || ext == ".ai" || ext == ".ps"))
-            {
-                try { img = GhostscriptRenderer.Render(_filePath); } catch (Exception ex) { Diagnostics.Set("gs error " + ex.Message); }
-            }
-
             if (img == null)
             {
                 try
@@ -239,15 +233,36 @@ namespace PreviewMotw
 
             if (img != null)
             {
+                img = FitForPreview(img);
                 Diagnostics.Set("image " + img.Width + "x" + img.Height + " ext=" + ext);
                 ShowImage(img);
                 return;
             }
 
             Diagnostics.Set("no content ext=" + ext);
-            ShowMessage("No preview available for " + ext +
-                        ((ext == ".eps" || ext == ".ai" || ext == ".ps") ? "\r\n(Ghostscript is required for PostScript)" : ""),
-                        Color.DimGray);
+            ShowMessage("No preview available for " + ext, Color.DimGray);
+        }
+
+        /// <summary>
+        /// Keeps the decoded bitmap inside a sane size: the preview pane never needs
+        /// more than a few thousand pixels, and a 100 MP poster would otherwise burn
+        /// hundreds of MB inside prevhost (that freeze was reported as a shell hang).
+        /// </summary>
+        private static Image FitForPreview(Image src)
+        {
+            const int MaxSide = 4096;
+            if (src.Width <= MaxSide && src.Height <= MaxSide) return src;
+            double k = Math.Min((double)MaxSide / src.Width, (double)MaxSide / src.Height);
+            int w = Math.Max(1, (int)(src.Width * k));
+            int h = Math.Max(1, (int)(src.Height * k));
+            var bmp = new Bitmap(w, h, PixelFormat.Format24bppRgb);
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.DrawImage(src, 0, 0, w, h);
+            }
+            try { src.Dispose(); } catch { }
+            return bmp;
         }
 
         private void ShowImage(Image img)
@@ -262,6 +277,17 @@ namespace PreviewMotw
 
         private void ShowWeb()
         {
+            try
+            {
+                if (new FileInfo(_filePath).Length > 25L * 1024 * 1024)
+                {
+                    Diagnostics.Set("svg too big");
+                    ShowMessage("SVG is too large to preview", Color.DimGray);
+                    return;
+                }
+            }
+            catch { }
+
             var wb = new WebBrowser();
             wb.Dock = DockStyle.Fill;
             wb.ScriptErrorsSuppressed = true;
@@ -504,67 +530,6 @@ namespace PreviewMotw
                 }
                 return null;
             }
-        }
-    }
-
-    /// <summary>Rasterizes the first page of EPS / AI / PS with Ghostscript.</summary>
-    internal static class GhostscriptRenderer
-    {
-        private static string _gsPath;
-        private static bool _searched;
-
-        public static string FindGhostscript()
-        {
-            if (_searched) return _gsPath;
-            _searched = true;
-
-            foreach (var root in new[] { @"C:\Program Files\gs", @"C:\Program Files (x86)\gs" })
-            {
-                try
-                {
-                    if (!Directory.Exists(root)) continue;
-                    foreach (var dir in Directory.GetDirectories(root, "gs*"))
-                    {
-                        foreach (var exe in new[] { "gswin64c.exe", "gswin32c.exe" })
-                        {
-                            string p = Path.Combine(dir, "bin", exe);
-                            if (File.Exists(p)) { _gsPath = p; return _gsPath; }
-                        }
-                    }
-                }
-                catch { }
-            }
-            return null;
-        }
-
-        public static Image Render(string file)
-        {
-            string gs = FindGhostscript();
-            if (gs == null) return null;
-
-            string outPng = Path.Combine(Path.GetTempPath(), "motw-prev-" + Guid.NewGuid().ToString("N") + ".png");
-            try
-            {
-                var psi = new ProcessStartInfo();
-                psi.FileName = gs;
-                psi.Arguments = "-q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=png16m -r120 -dFirstPage=1 -dLastPage=1 -sOutputFile=\"" + outPng + "\" \"" + file + "\"";
-                psi.UseShellExecute = false;
-                psi.CreateNoWindow = true;
-                psi.WindowStyle = ProcessWindowStyle.Hidden;
-                using (var p = Process.Start(psi))
-                {
-                    if (p == null) return null;
-                    if (!p.WaitForExit(20000)) { try { p.Kill(); } catch { } return null; }
-                }
-                if (!File.Exists(outPng)) return null;
-                using (var fs = new FileStream(outPng, FileMode.Open, FileAccess.Read, FileShare.Read))
-                using (var im = Image.FromStream(fs))
-                {
-                    return new Bitmap(im);
-                }
-            }
-            catch { return null; }
-            finally { try { if (File.Exists(outPng)) File.Delete(outPng); } catch { } }
         }
     }
 }

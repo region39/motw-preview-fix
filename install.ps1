@@ -47,7 +47,7 @@ $PrevhostAppId  = '{6d2b5079-2f0b-48dd-ab7f-97cec514d30b}'
 $TaskName       = 'PreviewMotw-Unblock'
 $HandlerName    = 'PreviewMotw Image Preview Handler'
 
-$ImageExts = 'png', 'jpg', 'jpeg', 'jpe', 'tif', 'tiff', 'bmp', 'gif', 'psd', 'psb', 'svg', 'svgz', 'ai', 'eps', 'ps'
+$ImageExts = 'png', 'jpg', 'jpeg', 'jpe', 'tif', 'tiff', 'bmp', 'gif', 'psd', 'psb', 'svg', 'svgz'
 $TextExts  = 'txt', 'json', 'md', 'markdown', 'sh', 'bash', 'log', 'yml', 'yaml', 'xml', 'css', 'js',
              'cs', 'py', 'ini', 'cfg', 'conf', 'ts', 'sql', 'ps1', 'bat', 'cmd'
 
@@ -131,9 +131,7 @@ if (-not $SkipPreviewHandler) {
     }
     Write-Ok ("text previewer associations: " + ($TextExts -join ' '))
 
-    if (-not (Test-Path -LiteralPath 'C:\Program Files\gs')) {
-        Write-Warn2 'Ghostscript not found - .eps/.ai/.ps will show "no preview" until it is installed'
-    }
+
 }
 
 # ---------------------------------------------------------------- watcher task
@@ -186,7 +184,7 @@ public static class PreviewMotwShell {
 [PreviewMotwShell]::SHChangeNotify(0x08000000, 0x1000, [IntPtr]::Zero, [IntPtr]::Zero)
 
 Write-Step 'Verification'
-foreach ($e in '.png', '.psd', '.svg', '.ai', '.eps', '.json', '.md', '.sh') {
+foreach ($e in '.png', '.psd', '.svg', '.json', '.md', '.sh') {
     $h = [PreviewMotwShell]::Handler($e)
     if ([string]::IsNullOrEmpty($h)) { Write-Warn2 ("{0,-6} no preview handler" -f $e) }
     else { Write-Host ("   {0,-6} -> {1}" -f $e, $h) }

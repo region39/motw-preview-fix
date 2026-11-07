@@ -1,11 +1,11 @@
-# motw-preview-fix
+﻿# motw-preview-fix
 
 Набор из двух независимых инструментов для Windows 10/11, которые убирают самую
 раздражающую связку «скачал файл → он не открывается/не предпросматривается»:
 
 1. **Preview handler pack** — собственный обработчик панели предпросмотра Проводника
    для форматов, которых в Windows 10 нет «из коробки»:
-   `.png .jpg .jpeg .tif .tiff .bmp .gif .psd .psb .svg .ai .eps .ps`, плюс явная
+   `.png .jpg .jpeg .tif .tiff .bmp .gif .psd .psb .svg`, плюс явная
    привязка текстовых форматов к встроенному TXT-обработчику.
 2. **MOTW auto-unblock** — служба, которая автоматически снимает метку
    «Файл получен из Интернета» (`Zone.Identifier`, он же Mark of the Web)
@@ -36,7 +36,6 @@ Windows помечает скачанные и распакованные из Z
 | `.png .jpg .jpeg .jpe .tif .tiff .bmp .gif` | GDI+ (`Image.FromStream`), вписывание без искажений | нет |
 | `.psd .psb` | полный композит PSD (big-endian, RLE PackBits / raw, RGB и CMYK); если композит не читается — встроенная JPEG-миниатюра | нет |
 | `.svg .svgz` | элемент WebBrowser (движок IE11) | IE11 (есть в Windows 10/11) |
-| `.ai .eps .ps` | Ghostscript, первая страница, 120 dpi | Ghostscript (опционально) |
 | `.txt .json .md .markdown .sh .bash .log .yml .yaml .xml .css .js .cs .py .ini .cfg .conf .ts .sql .ps1 .bat .cmd` | штатный Windows TXT Previewer | нет |
 
 ## Требования
@@ -45,7 +44,6 @@ Windows помечает скачанные и распакованные из Z
 - .NET Framework 4.x — `csc.exe` и `regasm.exe` уже входят в систему, Visual Studio не нужен;
 - PowerShell 5.1 (встроенный);
 - права администратора для установки (запись в `HKLM` и создание задачи планировщика);
-- опционально: [Ghostscript](https://ghostscript.com/releases/gsdnld.html) для `.ai/.eps/.ps`.
 
 ## Установка
 
@@ -169,8 +167,11 @@ PSD читается вручную: big-endian заголовок, пропус
 layer&mask, затем uncompressed (`compression=0`) или PackBits RLE (`compression=1`)
 плоские каналы 8 бит; сборка в `Bitmap` 24 bpp, CMYK конвертируется приближённо.
 ZIP-сжатые PSD (редкий случай) уходят в fallback — встроенную миниатюру 1036.
+Изображения крупнее 4096 px по стороне уменьшаются перед показом: панель предпросмотра
+всё равно не покажет больше, а `prevhost.exe` с 100-мегапиксельным постером упирается
+в память и выглядит как «зависший Проводник».
 
-EPS/AI/PS растеризуются Ghostscript-ом во временный PNG во временной папке.
+Форматы `.ai/.eps/.ps` намеренно не поддерживаются (см. «Ограничения»).
 
 ### MOTW watcher
 
@@ -207,7 +208,7 @@ SmartScreen, ограничения в Adobe Reader. Отключение мет
 - SVG рендерится движком IE11: без IE (`mshtml.dll` отключён групповой политикой)
   останется пустая панель;
 - `.psd` с ZIP-сжатием композита показывается миниатюрой 160×120;
-- AI/EPS рендерятся 0,5–2 с, Ghostscript запускается на каждый показ;
+- `.ai/.eps/.ps` предпросмотра не имеют: рендер через Ghostscript запускал внешний процесс на каждый показ и подвешивал Проводник, поддержка убрана. Если нужен предпросмотр таких файлов — открой их в Illustrator/Corel или держи рядом PDF-версию;
 - регистрация только 64-битная (32-битный `prevhost` обработчик не увидит);
 - исходники `.cs` должны оставаться в UTF-8 с BOM — `csc.exe` определяет кодировку по BOM.
 
@@ -222,10 +223,10 @@ MIT, см. [LICENSE](LICENSE).
 Two independent Windows 10/11 tools:
 
 1. **Preview handler pack** — a managed shell preview handler for `.png .jpg .jpeg
-   .tif .tiff .bmp .gif .psd .psb .svg .ai .eps .ps` (Windows ships none of these),
+   .tif .tiff .bmp .gif .psd .psb .svg` (Windows ships none of these),
    plus explicit `.txt/.json/.md/.sh/...` associations to the built-in TXT previewer.
    PSD/PSB composites are decoded in C#, SVG goes through the IE WebBrowser control,
-   EPS/AI/PS are rasterized with Ghostscript.
+
 2. **MOTW auto-unblock** — the `PreviewMotw-Unblock` scheduled task removes the
    `Zone.Identifier` alternate data stream from a set of roots on logon, via a
    `FileSystemWatcher`, with a periodic full sweep as a safety net.

@@ -1,4 +1,4 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Removes the preview-handler pack and the Mark-of-the-Web watcher.
@@ -27,7 +27,7 @@ $TaskName     = 'PreviewMotw-Unblock'
 $installDir   = Join-Path $env:LOCALAPPDATA 'PreviewMotw'
 $regasm       = "$env:SystemRoot\Microsoft.NET\Framework64\v4.0.30319\regasm.exe"
 
-$ImageExts = 'png', 'jpg', 'jpeg', 'jpe', 'tif', 'tiff', 'bmp', 'gif', 'psd', 'psb', 'svg', 'svgz', 'ai', 'eps', 'ps'
+$ImageExts = 'png', 'jpg', 'jpeg', 'jpe', 'tif', 'tiff', 'bmp', 'gif', 'psd', 'psb', 'svg', 'svgz'
 $TextExts  = 'txt', 'json', 'md', 'markdown', 'sh', 'bash', 'log', 'yml', 'yaml', 'xml', 'css', 'js',
              'cs', 'py', 'ini', 'cfg', 'conf', 'ts', 'sql', 'ps1', 'bat', 'cmd'
 
