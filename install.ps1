@@ -4,8 +4,9 @@
     Installs the preview-handler pack and the Mark-of-the-Web auto-unblocker.
 
 .DESCRIPTION
-    1. Builds %LOCALAPPDATA%\PreviewMotw\PreviewMotwHandlers.dll with csc.exe
-       (no SDK or Visual Studio required) and registers it as a COM preview handler.
+    0. Optionally (-WithPreviewHandler) builds PreviewMotwHandlers.dll with csc.exe
+       and registers it as a COM preview handler. Disabled by default - see the
+       warning in README, this part is experimental.
     2. Associates the handler with image / PSD / SVG / EPS / AI extensions and
        re-associates plain text extensions with the built-in Windows TXT previewer.
     3. Relaxes the Attachment Manager settings that make Windows keep the
@@ -19,8 +20,15 @@
 .PARAMETER SweepMinutes
     Interval of the fallback full sweep in the watcher task. Default: 30.
 
-.PARAMETER SkipPreviewHandler
-    Do not build/register the preview handler (MOTW part only).
+.PARAMETER WithPreviewHandler
+    EXPERIMENTAL. Build and register the managed preview handler for
+    images/PSD/SVG. It is not installed by default: the CLR handler loaded into
+    prevhost.exe has been observed to hang the shell on some machines (the shell
+    keeps restarting / the preview pane freezes on almost every file).
+    The MOTW part below is independent and safe.
+
+.PARAMETER SkipTextPreview
+    Do not associate .txt/.json/.md/.sh/... with the built-in TXT previewer.
 
 .PARAMETER SkipMotw
     Do not touch Attachment Manager settings and do not register the task
@@ -33,7 +41,8 @@
 param(
     [string[]]$Roots = @("$env:USERPROFILE\Downloads"),
     [int]$SweepMinutes = 30,
-    [switch]$SkipPreviewHandler,
+    [switch]$WithPreviewHandler,
+    [switch]$SkipTextPreview,
     [switch]$SkipMotw
 )
 
@@ -89,7 +98,7 @@ if (-not $SkipMotw) {
 }
 
 # ---------------------------------------------------------------- preview handler
-if (-not $SkipPreviewHandler) {
+if ($WithPreviewHandler) {
     Write-Step 'Preview handler'
 
     Copy-Item -LiteralPath (Join-Path $root 'src\PreviewMotwHandlers.cs') -Destination $installDir -Force
@@ -124,14 +133,21 @@ if (-not $SkipPreviewHandler) {
     }
     Write-Ok ("associations: " + ($ImageExts -join ' '))
 
+
+
+}
+
+# ---------------------------------------------------------------- text preview
+# Native Windows TXT previewer for plain-text formats: no CLR, no external
+# processes, nothing to hang the shell with. Safe to install without the handler.
+if (-not $SkipTextPreview) {
+    Write-Step 'Text preview associations (native TXT previewer)'
     foreach ($e in $TextExts) {
         $k = "HKLM:\Software\Classes\SystemFileAssociations\.$e\ShellEx\$PreviewIid"
         New-Item -Path $k -Force | Out-Null
         Set-ItemProperty -Path $k -Name '(default)' -Value $TxtPreviewer
     }
     Write-Ok ("text previewer associations: " + ($TextExts -join ' '))
-
-
 }
 
 # ---------------------------------------------------------------- watcher task
