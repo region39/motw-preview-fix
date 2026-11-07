@@ -123,12 +123,26 @@ Get-Item $f -Stream Zone.Identifier   # должно быть пусто
 ## Настройка
 
 - Список отслеживаемых путей и интервал контрольного прохода задаются при установке
-  (`-Roots`, `-SweepMinutes`) и попадают в аргументы задачи. Изменить позже:
+  (`-Roots`, `-SweepMinutes`). Пути не передаются через командную строку задачи —
+  установщик пишет их в `%LOCALAPPDATA%\PreviewMotw\roots.json`, а скрипт читает
+  оттуда (кавычки вокруг `"D:\"` в аргументах `powershell.exe -File` — известная
+  ловушка: `\"` там считается экранированной кавычкой).
+
+- Добавить/убрать путь позже — два способа:
 
 ```powershell
-$t = Get-ScheduledTask PreviewMotw-Unblock
-$t.Actions[0].Arguments   # видно текущие -Roots
+# 1) переустановить задачу с новым списком (в elevated PowerShell)
+.\install.ps1 -Roots 'D:\', 'E:\Media', "$env:USERPROFILE\Downloads"
+
+# 2) поправить roots.json вручную и перезапустить задачу
+@('D:\', 'E:\Media') | ConvertTo-Json -Compress |
+    Set-Content "$env:LOCALAPPDATA\PreviewMotw\roots.json" -Encoding UTF8
+Stop-ScheduledTask  PreviewMotw-Unblock
+Start-ScheduledTask PreviewMotw-Unblock
 ```
+
+- Скрипты не подписаны, поэтому запускать их нужно с `-ExecutionPolicy Bypass`
+  (или `Unblock-File` на скачанные `.ps1`), иначе `RemoteSigned` их не пустит.
 
 - Чтобы ZIP-распаковка вообще не ставила метку, используйте 7-Zip (он не переносит
   `Zone.Identifier`) — штатный ZIP-проводник метку ставит всегда.

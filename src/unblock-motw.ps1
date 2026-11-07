@@ -21,6 +21,8 @@
 
 .PARAMETER Roots
     Folders or drives to watch. Example: 'D:\', "$env:USERPROFILE\Downloads".
+    When omitted, the list is read from roots.json next to the script
+    (install.ps1 writes it), otherwise the current user's Downloads is used.
 
 .PARAMETER SweepMinutes
     Interval between full sweeps. 30 by default.
@@ -29,8 +31,7 @@
     .\unblock-motw.ps1 -Roots 'D:\', "$env:USERPROFILE\Downloads"
 #>
 param(
-    [Parameter(Mandatory = $false)]
-    [string[]]$Roots = @("$env:USERPROFILE\Downloads"),
+    [string[]]$Roots,
 
     [int]$SweepMinutes = 30
 )
@@ -41,6 +42,28 @@ $here = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvoca
 $log  = Join-Path $here 'unblock.log'
 $dirExe = "$env:SystemRoot\System32\cmd.exe"
 $RO = [System.IO.FileAttributes]::ReadOnly
+
+# Roots: parameter -> roots.json -> Downloads
+if (-not $Roots -or $Roots.Count -eq 0) {
+    $cfg = Join-Path $here 'roots.json'
+    if (Test-Path -LiteralPath $cfg) {
+        try {
+            $parsed = ConvertFrom-Json -InputObject (Get-Content -LiteralPath $cfg -Raw -Encoding UTF8)
+            $list = New-Object System.Collections.Generic.List[string]
+            foreach ($x in $parsed) { if ($x) { $list.Add([string]$x) } }
+            if ($list.Count -gt 0) { $Roots = $list.ToArray() }
+        } catch { }
+    }
+}
+if (-not $Roots -or $Roots.Count -eq 0) { $Roots = @("$env:USERPROFILE\Downloads") }
+
+# normalize: 'D:' -> 'D:\', no trailing slash for normal paths
+$Roots = $Roots | ForEach-Object {
+    $r = "$_".Trim()
+    if ($r -match '^[A-Za-z]:$') { $r + '\' }
+    elseif ($r.Length -gt 3) { $r.TrimEnd('\') }
+    else { $r }
+} | Where-Object { $_ }
 
 function Write-Log([string]$Message) {
     try {

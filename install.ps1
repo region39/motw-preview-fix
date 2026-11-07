@@ -1,4 +1,4 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Installs the preview-handler pack and the Mark-of-the-Web auto-unblocker.
@@ -101,8 +101,12 @@ if (-not $SkipPreviewHandler) {
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $dll)) { throw 'csc.exe failed to build PreviewMotwHandlers.dll' }
     Write-Ok "built $dll"
 
+    # regasm writes its "unsigned assembly" warning to stderr: keep that non-terminating
+    $ErrorActionPreference = 'Continue'
     & $regasm /nologo /codebase $dll 2>&1 | Where-Object { $_ -notmatch 'RA0000' } | ForEach-Object { Write-Host "   $_" }
-    if ($LASTEXITCODE -ne 0) { throw 'regasm.exe failed to register the handler' }
+    $regasmExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($regasmExit -ne 0) { throw 'regasm.exe failed to register the handler' }
 
     $clsidKey = "HKLM:\Software\Classes\CLSID\$HandlerClsid"
     Set-ItemProperty -Path $clsidKey -Name '(default)' -Value $HandlerName
@@ -139,8 +143,11 @@ if (-not $SkipMotw) {
     Copy-Item -LiteralPath (Join-Path $root 'src\unblock-motw.ps1') -Destination $installDir -Force
     $script = Join-Path $installDir 'unblock-motw.ps1'
 
-    $rootsArg = ($Roots | ForEach-Object { '"' + $_ + '"' }) -join ','
-    $argLine = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -Roots {1} -SweepMinutes {2}' -f $script, $rootsArg, $SweepMinutes
+    # roots are handed over through roots.json: quoting drive roots like "D:\" on a
+    # command line is a minefield (\" is an escaped quote for powershell.exe)
+    ConvertTo-Json -InputObject @($Roots) -Compress | Set-Content -LiteralPath (Join-Path $installDir 'roots.json') -Encoding UTF8
+
+    $argLine = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -SweepMinutes {1}' -f $script, $SweepMinutes
 
     $action    = New-ScheduledTaskAction -Execute $powershell -Argument $argLine
     $trigger   = New-ScheduledTaskTrigger -AtLogOn
@@ -159,6 +166,7 @@ if (-not $SkipMotw) {
 }
 
 # ---------------------------------------------------------------- refresh shell
+if (-not ('PreviewMotwShell' -as [type])) {
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -174,6 +182,7 @@ public static class PreviewMotwShell {
     }
 }
 '@
+}
 [PreviewMotwShell]::SHChangeNotify(0x08000000, 0x1000, [IntPtr]::Zero, [IntPtr]::Zero)
 
 Write-Step 'Verification'
