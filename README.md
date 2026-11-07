@@ -65,8 +65,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1 -SkipPreviewHandler -Root
 
 1. компилирует `src\PreviewMotwHandlers.cs` в `%LOCALAPPDATA%\PreviewMotw\PreviewMotwHandlers.dll`;
 2. `regasm /codebase` → COM-класс `{B5C1D3E7-4A62-4F0F-9C1E-7D2A5B8F3C64}`
-   (+ `Implemented Categories\{8895B1C6-…}`, AppID `prevhost` `{6d2b5079-…}`,
-   `DisableLowILProcessIsolation=1`);
+   (+ `Implemented Categories\{8895B1C6-…}`, AppID `prevhost` `{6d2b5079-…}`);
 3. прописывает ассоциации обработчика в
    `HKLM\Software\Classes\SystemFileAssociations\.<ext>\ShellEx\{8895B1C6-…}`;
 4. ослабляет Attachment Manager (см. ниже);
@@ -157,8 +156,8 @@ powershell -ExecutionPolicy Bypass -File .\uninstall.ps1 -Full -Purge  # + на�
 ### Обработчик предпросмотра
 
 Managed COM-класс, зарегистрированный через `mscoree.dll` + `regasm /codebase`;
-загружается Проводником в `prevhost.exe` (поэтому нужен AppID prevhost и
-`DisableLowILProcessIsolation`, иначе хост не сможет создать дочернее окно).
+загружается Проводником в `prevhost.exe` (поэтому в CLSID прописан AppID
+`prevhost` `{6d2b5079-…}`; обработчик живёт в отдельном процессе, а не внутри `explorer.exe`).
 Обработчик создаёт `Panel` в WinForms, перепарентит его к окну хоста
 (`SetParent` + `WS_CHILD`) и кладёт внутрь `PictureBox` (GDI+), `WebBrowser`
 (SVG) или `Label` с сообщением.

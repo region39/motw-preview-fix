@@ -111,7 +111,7 @@ if (-not $SkipPreviewHandler) {
     $clsidKey = "HKLM:\Software\Classes\CLSID\$HandlerClsid"
     Set-ItemProperty -Path $clsidKey -Name '(default)' -Value $HandlerName
     Set-ItemProperty -Path $clsidKey -Name 'AppID'     -Value $PrevhostAppId
-    New-ItemProperty -Path $clsidKey -Name 'DisableLowILProcessIsolation' -Value 1 -PropertyType DWord -Force | Out-Null
+
     New-Item -Path "$clsidKey\Implemented Categories\$PreviewIid" -Force | Out-Null
     New-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\PreviewHandlers' `
         -Name $HandlerClsid -Value $HandlerName -PropertyType String -Force | Out-Null
