@@ -1,0 +1,18 @@
+# build outputs
+*.dll
+*.exe
+*.pdb
+*.obj
+*.ilk
+
+# logs
+*.log
+
+# OS / editor noise
+Thumbs.db
+desktop.ini
+.DS_Store
+.vs/
+.vscode/
+.idea/
+*.user
